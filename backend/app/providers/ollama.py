@@ -83,7 +83,8 @@ class OllamaProvider(LLMProviderInterface):
             # Automatic fallback to Cloud provider if configured (e.g. deployed to Render/cloud environment)
             has_anthropic = bool(settings.ANTHROPIC_API_KEY and len(settings.ANTHROPIC_API_KEY) > 5)
             has_openai = bool(settings.OPENAI_API_KEY and len(settings.OPENAI_API_KEY) > 5)
-            if has_anthropic or has_openai:
+            has_groq = bool(settings.GROQ_API_KEY and len(settings.GROQ_API_KEY) > 5)
+            if has_anthropic or has_openai or has_groq:
                 logger.warning(f"Ollama daemon unreachable at {self.base_url}. Auto-falling back to Cloud LLM.")
                 from app.providers.cloud import CloudProvider
                 cloud = CloudProvider()

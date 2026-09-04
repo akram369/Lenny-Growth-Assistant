@@ -33,12 +33,14 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "llama3.2:3b"
     OLLAMA_TIMEOUT_SECONDS: int = 60
 
-    # Cloud LLM (Anthropic / OpenAI)
-    CLOUD_PROVIDER: str = "anthropic"
+    # Cloud LLM (Anthropic / OpenAI / Groq)
+    CLOUD_PROVIDER: str = "groq"
     ANTHROPIC_API_KEY: str = ""
     ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
 
     # RAG & Vector Embeddings
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"

@@ -17,9 +17,14 @@ class CloudProvider(LLMProviderInterface):
         driver: str = settings.CLOUD_PROVIDER,  # "anthropic" or "openai"
     ):
         self.driver = driver.lower()
+        self.base_url = None
         if self.driver == "anthropic":
             self.api_key = settings.ANTHROPIC_API_KEY
             self.model = settings.ANTHROPIC_MODEL
+        elif self.driver == "groq":
+            self.api_key = settings.GROQ_API_KEY or settings.OPENAI_API_KEY
+            self.model = settings.GROQ_MODEL
+            self.base_url = "https://api.groq.com/openai/v1"
         else:
             self.api_key = settings.OPENAI_API_KEY
             self.model = settings.OPENAI_MODEL
@@ -88,7 +93,10 @@ class CloudProvider(LLMProviderInterface):
     ) -> AsyncIterator[str]:
         try:
             from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=self.api_key)
+            client_kwargs = {"api_key": self.api_key}
+            if self.base_url:
+                client_kwargs["base_url"] = self.base_url
+            client = AsyncOpenAI(**client_kwargs)
             formatted = []
             if system_prompt:
                 formatted.append({"role": "system", "content": system_prompt})

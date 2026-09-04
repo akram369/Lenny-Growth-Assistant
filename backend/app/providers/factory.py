@@ -23,8 +23,13 @@ def get_provider(provider_name: Optional[str] = None) -> LLMProviderInterface:
     global _ollama_instance, _cloud_instance
     target = (provider_name or settings.DEFAULT_LLM_PROVIDER).lower().strip()
 
-    if target in ("cloud", "anthropic", "openai"):
-        driver = "openai" if target == "openai" else "anthropic"
+    if target in ("cloud", "anthropic", "openai", "groq"):
+        if target == "groq" or (target == "cloud" and settings.CLOUD_PROVIDER.lower() == "groq"):
+            driver = "groq"
+        elif target == "openai" or (target == "cloud" and settings.CLOUD_PROVIDER.lower() == "openai"):
+            driver = "openai"
+        else:
+            driver = "anthropic"
         if _cloud_instance is None or _cloud_instance.driver != driver:
             _cloud_instance = CloudProvider(driver=driver)
         return _cloud_instance
