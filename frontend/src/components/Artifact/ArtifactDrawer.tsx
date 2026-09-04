@@ -23,7 +23,43 @@ export const ArtifactDrawer: React.FC<ArtifactDrawerProps> = ({
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
   const [copied, setCopied] = useState(false);
 
-  if (!isOpen || artifacts.length === 0) return null;
+  if (!isOpen) return null;
+
+  if (artifacts.length === 0) {
+    return (
+      <div className="artifact-drawer">
+        <div style={{
+          padding: '12px 18px',
+          borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'rgba(10, 13, 20, 0.7)',
+        }}>
+          <div style={{ fontSize: '13.5px', fontWeight: 600, color: '#fff' }}>Artifact Viewer</div>
+          <button onClick={onClose} className="btn-icon" title="Close Artifact Viewer">
+            <X size={15} />
+          </button>
+        </div>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 'calc(100% - 50px)',
+          color: 'var(--text-muted)',
+          padding: '24px',
+          textAlign: 'center',
+        }}>
+          <FileText size={36} style={{ marginBottom: '12px', opacity: 0.4 }} />
+          <div style={{ fontSize: '14px', color: '#fff', marginBottom: '6px' }}>No Artifact Deliverable</div>
+          <div style={{ fontSize: '12px', maxWidth: '280px', lineHeight: 1.5 }}>
+            Ask the assistant to generate a Ship 30 essay or code deliverable to view it here.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const currentArtifact = artifacts[activeArtifactIndex] || artifacts[0];
   const isHtml = currentArtifact.artifact_type === 'html';

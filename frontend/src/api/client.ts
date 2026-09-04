@@ -109,6 +109,8 @@ async function parseSSE(response: Response, handlers: StreamChatHandlers) {
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
 
+  let currentEvent = 'message';
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -117,8 +119,6 @@ async function parseSSE(response: Response, handlers: StreamChatHandlers) {
 
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-
-      let currentEvent = 'message';
 
       for (const line of lines) {
         const trimmed = line.trim();

@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check, Sparkles, User, FileText, Code } from 'lucide-react';
-import { Message } from '../../types';
+import { Message, Artifact } from '../../types';
 import { SourceBadge } from './SourceBadge';
 
 interface MessageItemProps {
   message: Message;
-  onOpenArtifact?: () => void;
+  onOpenArtifact?: (artifact?: Artifact) => void;
 }
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onOpenArtifact }) => {
@@ -20,12 +20,33 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onOpenArtifac
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Extract artifact if present in message content
+  const parsedArtifact: Artifact | null = React.useMemo(() => {
+    const match = message.content.match(/<artifact\s+([^>]*?)>([\s\S]*?)(?:<\/artifact>|$)/i);
+    if (!match) return null;
+
+    const attrStr = match[1];
+    const body = match[2].trim();
+
+    const titleMatch = attrStr.match(/title=["'](.*?)["']/i);
+    const typeMatch = attrStr.match(/type=["'](.*?)["']/i);
+    const idMatch = attrStr.match(/identifier=["'](.*?)["']/i);
+
+    const artifactType = (typeMatch ? typeMatch[1] : 'markdown').toLowerCase();
+    return {
+      title: titleMatch ? titleMatch[1] : 'Generated Artifact',
+      artifact_type: artifactType === 'html' ? 'html' : 'markdown',
+      identifier: idMatch ? idMatch[1] : `art-${Date.now()}`,
+      content: body,
+    };
+  }, [message.content]);
+
   // Clean raw artifact tags from chat view if they appear in text
   const cleanDisplayContent = (content: string) => {
     return content.replace(/<artifact\s+[^>]*>[\s\S]*?(?:<\/artifact>|$)/gi, '');
   };
 
-  const hasArtifactTag = /<artifact\s+[^>]*>/i.test(message.content);
+  const hasArtifactTag = parsedArtifact !== null || /<artifact\s+[^>]*>/i.test(message.content);
   const displayContent = cleanDisplayContent(message.content).trim();
 
   return (
@@ -100,13 +121,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onOpenArtifac
       {/* Artifact Callout Card */}
       {hasArtifactTag && (
         <div
-          onClick={onOpenArtifact}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onOpenArtifact) onOpenArtifact(parsedArtifact || undefined);
+          }}
           style={{
             marginTop: '8px',
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(99, 102, 241, 0.08))',
-            border: '1px solid rgba(245, 158, 11, 0.35)',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(99, 102, 241, 0.09))',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
             borderRadius: 'var(--radius-md)',
-            padding: '12px 16px',
+            padding: '14px 18px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -118,33 +142,42 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onOpenArtifac
             e.currentTarget.style.transform = 'translateY(-1px)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.4)';
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '32px',
-              height: '32px',
+              width: '36px',
+              height: '36px',
               borderRadius: 'var(--radius-sm)',
               background: 'rgba(245, 158, 11, 0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--accent-lenny)',
+              flexShrink: 0,
             }}>
-              {message.content.includes('type="html"') ? <Code size={16} /> : <FileText size={16} />}
+              {(parsedArtifact?.artifact_type === 'html' || message.content.includes('type="html"')) ? <Code size={18} /> : <FileText size={18} />}
             </div>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>
-                Generated Artifact Ready
+              <div style={{ fontSize: '13.5px', fontWeight: 600, color: '#fff' }}>
+                {parsedArtifact?.title || 'Generated Artifact Ready'}
               </div>
-              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 Click to open interactive side-by-side preview & export options
               </div>
             </div>
           </div>
-          <button className="btn btn-primary" style={{ padding: '5px 12px', fontSize: '12px' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenArtifact) onOpenArtifact(parsedArtifact || undefined);
+            }}
+            className="btn btn-primary"
+            style={{ padding: '6px 14px', fontSize: '12.5px', pointerEvents: 'auto' }}
+          >
             Open Viewer
           </button>
         </div>

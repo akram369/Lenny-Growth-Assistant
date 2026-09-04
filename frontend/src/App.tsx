@@ -13,6 +13,25 @@ import {
 } from './api/client';
 import { Artifact, HealthStatus, Message, SessionSummary, SourceCitation } from './types';
 
+function parseArtifactFromContent(text: string, defaultTitle = 'Generated Artifact', defaultId?: string): Artifact | null {
+  const match = text.match(/<artifact\s+([^>]*?)>([\s\S]*?)(?:<\/artifact>|$)/i);
+  if (!match) return null;
+
+  const attrStr = match[1];
+  const body = match[2].trim();
+  const titleMatch = attrStr.match(/title=["'](.*?)["']/i);
+  const typeMatch = attrStr.match(/type=["'](.*?)["']/i);
+  const idMatch = attrStr.match(/identifier=["'](.*?)["']/i);
+
+  const artifactType: 'markdown' | 'html' = (typeMatch ? typeMatch[1] : 'markdown').toLowerCase() === 'html' ? 'html' : 'markdown';
+  return {
+    title: titleMatch ? titleMatch[1] : defaultTitle,
+    artifact_type: artifactType,
+    identifier: idMatch ? idMatch[1] : (defaultId || `art-${Date.now()}`),
+    content: body,
+  };
+}
+
 export const App: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -65,9 +84,18 @@ export const App: React.FC = () => {
       const detail = await fetchSession(sessionId);
       setActiveSessionId(detail.id);
       setMessages(detail.messages);
-      setArtifacts(detail.artifacts);
-      if (detail.artifacts.length > 0) {
-        setActiveArtifactIndex(detail.artifacts.length - 1);
+
+      const loadedArtifacts: Artifact[] = [...(detail.artifacts || [])];
+      for (const msg of detail.messages || []) {
+        const parsed = parseArtifactFromContent(msg.content);
+        if (parsed && !loadedArtifacts.some((a) => (parsed.identifier && a.identifier === parsed.identifier) || a.title === parsed.title)) {
+          loadedArtifacts.push(parsed);
+        }
+      }
+
+      setArtifacts(loadedArtifacts);
+      if (loadedArtifacts.length > 0) {
+        setActiveArtifactIndex(loadedArtifacts.length - 1);
         setArtifactOpen(true);
       } else {
         setArtifactOpen(false);
@@ -75,6 +103,30 @@ export const App: React.FC = () => {
     } catch (e) {
       console.error(`Failed to load session ${sessionId}:`, e);
     }
+  };
+
+  const handleOpenArtifact = (art?: Artifact) => {
+    if (art && art.content) {
+      setArtifacts((prev) => {
+        const existingIdx = prev.findIndex(
+          (a) => (art.identifier && a.identifier === art.identifier) || a.title === art.title
+        );
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = { ...updated[existingIdx], ...art };
+          setActiveArtifactIndex(existingIdx);
+          return updated;
+        }
+        const updated = [...prev, art];
+        setActiveArtifactIndex(updated.length - 1);
+        return updated;
+      });
+    } else if (artifacts.length > 0) {
+      if (activeArtifactIndex < 0 || activeArtifactIndex >= artifacts.length) {
+        setActiveArtifactIndex(artifacts.length - 1);
+      }
+    }
+    setArtifactOpen(true);
   };
 
   const handleNewChat = () => {
@@ -167,6 +219,25 @@ export const App: React.FC = () => {
             setMessages((prev) => [...prev, assistantMsg]);
             setStreamingContent('');
             setStreamingSources([]);
+
+            // Parse any artifact in accumulatedContent if onArtifact was not received
+            const parsed = parseArtifactFromContent(accumulatedContent);
+            if (parsed) {
+              setArtifacts((prev) => {
+                const idx = prev.findIndex((a) => (parsed.identifier && a.identifier === parsed.identifier) || a.title === parsed.title);
+                if (idx >= 0) {
+                  const updated = [...prev];
+                  updated[idx] = parsed;
+                  setActiveArtifactIndex(idx);
+                  return updated;
+                }
+                const updated = [...prev, parsed];
+                setActiveArtifactIndex(updated.length - 1);
+                return updated;
+              });
+              setArtifactOpen(true);
+            }
+
             loadSessions();
           },
           onError: (err) => {
@@ -241,10 +312,29 @@ export const App: React.FC = () => {
             setArtifactOpen(true);
           },
           onDone: () => {
+            const parsed = parseArtifactFromContent(accumulatedContent, `Ship 30: ${topic}`, 'ship30-essay');
+            if (parsed) {
+              setArtifacts((prev) => {
+                const idx = prev.findIndex((a) => (parsed.identifier && a.identifier === parsed.identifier) || a.title === parsed.title);
+                if (idx >= 0) {
+                  const updated = [...prev];
+                  updated[idx] = parsed;
+                  setActiveArtifactIndex(idx);
+                  return updated;
+                }
+                const updated = [...prev, parsed];
+                setActiveArtifactIndex(updated.length - 1);
+                return updated;
+              });
+              setArtifactOpen(true);
+            }
+
             const assistantMsg: Message = {
               id: `asst-${Date.now()}`,
               role: 'assistant',
-              content: `I have synthesized an atomic Ship 30 for 30 essay on **${topic}** grounded strictly in Lenny's podcast transcripts. The essay has been mounted in your side-by-side artifact viewer on the right.`,
+              content: accumulatedContent.includes('<artifact')
+                ? accumulatedContent
+                : `I have synthesized an atomic Ship 30 for 30 essay on **${topic}** grounded strictly in Lenny's podcast transcripts. The essay has been mounted in your side-by-side artifact viewer on the right.`,
               sources: currentSources,
               created_at: new Date().toISOString(),
             };
@@ -315,7 +405,7 @@ export const App: React.FC = () => {
           onSendMessage={handleSendMessage}
           onTriggerShip30={handleTriggerShip30}
           onCancelStream={handleCancelStream}
-          onOpenArtifact={() => setArtifactOpen(true)}
+          onOpenArtifact={handleOpenArtifact}
           splitActive={artifactOpen}
         />
 

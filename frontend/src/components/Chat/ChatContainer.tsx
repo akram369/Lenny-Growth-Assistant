@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Feather, Layers, ArrowRight, Loader2, StopCircle } from 'lucide-react';
-import { Message, SourceCitation } from '../../types';
+import { Message, SourceCitation, Artifact } from '../../types';
 import { MessageItem } from './MessageItem';
 
 interface ChatContainerProps {
@@ -11,7 +11,7 @@ interface ChatContainerProps {
   onSendMessage: (text: string) => void;
   onTriggerShip30: (topic: string) => void;
   onCancelStream?: () => void;
-  onOpenArtifact: () => void;
+  onOpenArtifact: (artifact?: Artifact) => void;
   splitActive: boolean;
 }
 
