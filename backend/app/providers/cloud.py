@@ -65,13 +65,15 @@ class CloudProvider(LLMProviderInterface):
                 if m.get("role") in ("user", "assistant")
             ]
 
-            async with client.messages.stream(
-                model=self.model,
-                max_tokens=kwargs.get("max_tokens", 4096),
-                system=system_prompt,
-                messages=formatted,
-                temperature=kwargs.get("temperature", 0.3),
-            ) as stream:
+            stream_params: Dict[str, Any] = {
+                "model": self.model,
+                "max_tokens": kwargs.get("max_tokens", 4096),
+                "messages": formatted,
+            }
+            if system_prompt:
+                stream_params["system"] = system_prompt
+
+            async with client.messages.stream(**stream_params) as stream:
                 async for text in stream.text_stream:
                     yield text
         except Exception as e:

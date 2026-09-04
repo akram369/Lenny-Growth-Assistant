@@ -29,6 +29,11 @@ export const Header: React.FC<HeaderProps> = ({
   const dbChunks = health?.database?.indexed_chunks || 0;
   const isHealthy = health?.status === 'online';
 
+  const ollamaInfo = health?.llm?.providers?.find((p) => p.id === 'ollama');
+  const cloudInfo = health?.llm?.providers?.find((p) => p.id === 'cloud');
+  const isOllamaOnline = ollamaInfo?.status === 'healthy' || ollamaInfo?.status === 'ready';
+  const isCloudConfigured = cloudInfo?.status === 'ready';
+
   return (
     <header className="app-header">
       <div className="brand-section">
@@ -64,6 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
         }}>
           <button
             onClick={() => onProviderChange('ollama')}
+            title={isOllamaOnline ? 'Local Ollama: Online & Ready' : 'Local Ollama: Offline (Local only)'}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -79,12 +85,22 @@ export const Header: React.FC<HeaderProps> = ({
               transition: 'all 0.2s ease',
             }}
           >
+            <span
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor: isOllamaOnline ? '#10b981' : '#f59e0b',
+                display: 'inline-block',
+              }}
+            />
             <Cpu size={14} />
             <span>Local: Ollama</span>
           </button>
 
           <button
             onClick={() => onProviderChange('cloud')}
+            title={isCloudConfigured ? 'Cloud LLM: Online & Ready' : 'Cloud LLM: Unconfigured'}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -100,6 +116,15 @@ export const Header: React.FC<HeaderProps> = ({
               transition: 'all 0.2s ease',
             }}
           >
+            <span
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor: isCloudConfigured ? '#10b981' : '#64748b',
+                display: 'inline-block',
+              }}
+            />
             <Cloud size={14} />
             <span>Cloud: Claude/OpenAI</span>
           </button>

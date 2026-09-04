@@ -46,7 +46,9 @@ export const App: React.FC = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [artifactOpen, setArtifactOpen] = useState<boolean>(false);
-  const [currentProvider, setCurrentProvider] = useState<string>('ollama');
+  const [currentProvider, setCurrentProvider] = useState<string>(() => {
+    return localStorage.getItem('lenny_assistant_provider') || '';
+  });
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -62,12 +64,34 @@ export const App: React.FC = () => {
     try {
       const h = await fetchHealth();
       setHealth(h);
-      if (h.llm?.default_provider && !currentProvider) {
-        setCurrentProvider(h.llm.default_provider);
+
+      const saved = localStorage.getItem('lenny_assistant_provider');
+      const ollamaStatus = h.llm?.providers?.find((p) => p.id === 'ollama')?.status;
+      const cloudStatus = h.llm?.providers?.find((p) => p.id === 'cloud')?.status;
+
+      // Smart provider selection:
+      if (!saved) {
+        // No explicit choice saved: use server's default_provider or fallback to whichever is ready
+        if (h.llm?.default_provider === 'cloud' || (ollamaStatus === 'offline' && cloudStatus === 'ready')) {
+          setCurrentProvider('cloud');
+        } else {
+          setCurrentProvider(h.llm?.default_provider || 'ollama');
+        }
+      } else if (saved === 'ollama' && ollamaStatus === 'offline' && cloudStatus === 'ready') {
+        // If user's stored preference is ollama but ollama is offline on this host (e.g. cloud deployment), switch to cloud
+        setCurrentProvider('cloud');
+      } else {
+        setCurrentProvider(saved);
       }
     } catch (e) {
       console.warn('Health check probe warning:', e);
+      setCurrentProvider((prev) => prev || 'ollama');
     }
+  };
+
+  const handleProviderChange = (provider: string) => {
+    setCurrentProvider(provider);
+    localStorage.setItem('lenny_assistant_provider', provider);
   };
 
   const loadSessions = async () => {
@@ -374,7 +398,7 @@ export const App: React.FC = () => {
       {/* Top Navigation */}
       <Header
         currentProvider={currentProvider}
-        onProviderChange={setCurrentProvider}
+        onProviderChange={handleProviderChange}
         health={health}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}

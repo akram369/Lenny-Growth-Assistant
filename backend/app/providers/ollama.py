@@ -80,6 +80,17 @@ class OllamaProvider(LLMProviderInterface):
                             continue
         except httpx.ConnectError:
             logger.error(f"Could not connect to Ollama at {self.base_url}")
+            # Automatic fallback to Cloud provider if configured (e.g. deployed to Render/cloud environment)
+            has_anthropic = bool(settings.ANTHROPIC_API_KEY and len(settings.ANTHROPIC_API_KEY) > 5)
+            has_openai = bool(settings.OPENAI_API_KEY and len(settings.OPENAI_API_KEY) > 5)
+            if has_anthropic or has_openai:
+                logger.warning(f"Ollama daemon unreachable at {self.base_url}. Auto-falling back to Cloud LLM.")
+                from app.providers.cloud import CloudProvider
+                cloud = CloudProvider()
+                yield f"> *[Notice: Local Ollama is unreachable at {self.base_url}. Automatically falling back to Cloud LLM ({cloud.model_name}).]*\n\n"
+                async for token in cloud.stream(messages, system_prompt, **kwargs):
+                    yield token
+                return
             yield f"\n\n[Local Inference Error: Cannot connect to Ollama at {self.base_url}. Please ensure Ollama is running (`ollama serve`).]"
         except httpx.TimeoutException:
             logger.error(f"Ollama timed out after {self.timeout}s")
