@@ -24,7 +24,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python requirements
+# Install lightweight CPU-only PyTorch first (drastically reduces RAM from 800MB to ~120MB, eliminates CUDA bloat)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining backend requirements
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -36,6 +39,16 @@ COPY --from=frontend-builder /app/frontend/dist ./backend/static
 
 WORKDIR /app/backend
 
+# Pre-cache embedding model weights during build phase (Render build has ample RAM)
+ENV HF_HOME=/root/.cache/huggingface
+ENV TOKENIZERS_PARALLELISM=false
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+RUN python -c "import torch; torch.set_num_threads(1); from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+
+# Pre-seed sample transcripts into SQLite database during build phase
+RUN python scripts/ingest.py --clear
+
 # Render dynamic port binding (defaults to 10000 on Render, or 8001)
 ENV PORT=10000
 ENV ENVIRONMENT=production
@@ -45,5 +58,5 @@ EXPOSE 10000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:${PORT}/api/health || exit 1
 
-# On startup: ingest sample transcripts, then start Uvicorn
-CMD sh -c "python scripts/ingest.py && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"
+# Start Uvicorn directly (no boot-time downloads or heavy ingestion)
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

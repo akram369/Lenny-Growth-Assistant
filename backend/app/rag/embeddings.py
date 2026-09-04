@@ -8,20 +8,33 @@ import numpy as np
 from app.config import settings
 from app.logging_config import logger
 
+import os
+
+# Limit CPU threads and memory allocations for low-RAM environments (e.g. Render 512MB)
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
 _model = None
 
 
 def get_embedding_model():
-    """Lazy-loads the sentence-transformers model instance."""
+    """Lazy-loads the sentence-transformers model instance with memory constraints."""
     global _model
     if _model is None:
         try:
+            try:
+                import torch
+                torch.set_num_threads(1)
+            except Exception:
+                pass
+
             from sentence_transformers import SentenceTransformer
             logger.info(f"Loading embedding model: {settings.EMBEDDING_MODEL_NAME}")
             _model = SentenceTransformer(settings.EMBEDDING_MODEL_NAME)
             logger.info("Embedding model loaded successfully.")
-        except Exception as e:
-            logger.error(f"Failed to load SentenceTransformer: {e}. Falling back to deterministic pseudo-embedding for testing.")
+        except (Exception, MemoryError) as e:
+            logger.error(f"Failed to load SentenceTransformer ({e}). Falling back to deterministic pseudo-embedding.")
             _model = "fallback"
     return _model
 
