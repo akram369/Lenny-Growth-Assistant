@@ -4,6 +4,7 @@ Initializes lifespan handlers, CORS middleware, API router, and global exception
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -65,13 +66,34 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/")
-async def root():
-    """Root status endpoint providing service overview and documentation links."""
-    return {
-        "app": settings.APP_NAME,
-        "version": "1.0.0",
-        "status": "online",
-        "docs_url": "/docs",
-        "health_check": "/api/health",
-    }
+# Serve static frontend bundle if present (Production combined build)
+static_dir = Path(__file__).resolve().parent.parent / "static"
+if static_dir.exists() and (static_dir / "index.html").exists():
+    from starlette.staticfiles import StaticFiles
+    from starlette.responses import FileResponse
+
+    assets_dir = static_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    async def serve_spa_root():
+        return FileResponse(static_dir / "index.html")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa_fallback(full_path: str):
+        file_path = static_dir / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(static_dir / "index.html")
+else:
+    @app.get("/")
+    async def root():
+        """Root status endpoint providing service overview and documentation links."""
+        return {
+            "app": settings.APP_NAME,
+            "version": "1.0.0",
+            "status": "online",
+            "docs_url": "/docs",
+            "health_check": "/api/health",
+        }
